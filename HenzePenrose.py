@@ -4,7 +4,7 @@ import itertools
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 
-#import line_profiler
+import line_profiler
 
 class HenzePenrose():
   #calculates the henze-penrose statistic between set_1 and set_2
@@ -15,12 +15,13 @@ class HenzePenrose():
   #with each being a 5x5 image, set_1 should be of shape 100x5x5 and 
   #set_2 should be of shape 200x5x5. Every dimension after the first should
   #be equivalent.
-  #@profile
-  def __init__(self, distance_method):
+  @profile
+  def __init__(self, distance_method,device):
     if distance_method == 'euclid':
       self.distance_function = self.euclid
-
+    self.device = device
   
+  @profile
   def construct_graph(self,n,distances,pairs):
     #constructs the nxn matrix representing the graph
     #distances: ith element represents the distance
@@ -33,7 +34,7 @@ class HenzePenrose():
     
     return graph
   
-  #@profile
+  @profile
   def euclid(self, vectors):
     #vectors: nxdim array
     n,dim = vectors.shape
@@ -43,7 +44,7 @@ class HenzePenrose():
     comb = len(pairs)
     
     #reorganize vectors into a len(pairs)x2xdim shape
-    distances = torch.zeros(comb,2,dim)
+    distances = torch.zeros(comb,2,dim).to(self.device)
     for i,pair in enumerate(pairs):
       distances[i,0] = vectors[pair[0]]
       distances[i,1] = -vectors[pair[1]] #can use torch.sum() to subtract
@@ -56,7 +57,7 @@ class HenzePenrose():
     
     return distances,pairs
   
-  #@profile
+  @profile
   def minimumSpanningTree(self, vectors):
     #input shape: nxdim
     #output: nxn numpy array with the minimum spanning tree
@@ -73,7 +74,7 @@ class HenzePenrose():
     
     return(Tcsr)
   
-  #@profile
+  @profile
   def calculateSfr(self, class_1, class_2):
     #calculates Sfr, number of edges linking disparate classes in MST
     #inputs: class_1 and class_2 both nx? element tensors, where ? is arbitrary but must
@@ -93,7 +94,7 @@ class HenzePenrose():
     
     return(np.sum(edge_locations))
   
-  #@profile
+  @profile
   def __call__(self, class_1, class_2):
     #inputs: class_1 and class_2 both nx? element tensors, where ? is arbitrary but must
     #be the same between class_1 and class_2
