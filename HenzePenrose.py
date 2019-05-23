@@ -94,7 +94,7 @@ class HenzePenrose():
     return(np.sum(edge_locations))
   
   #@profile
-  def calculateHP(self, class_1, class_2):
+  def __call__(self, class_1, class_2):
     #inputs: class_1 and class_2 both nx? element tensors, where ? is arbitrary but must
     #be the same between class_1 and class_2
     #output: a scalar value

@@ -4,10 +4,10 @@ import numpy as np
 import os, itertools
 from HenzePenrose import HenzePenrose
 
-import line_profiler
+#import line_profiler
 
 class ModelTester():
-  @profile
+  #@profile
   def __init__(self, training_set, test_set, classes, save_dir, device):
     #training_set and test_set must be iterable
     #set batch size to 1
@@ -30,7 +30,7 @@ class ModelTester():
     self.HP_euclid = HenzePenrose('euclid')
     #self.HP_cosine = HenzePenrose('cosine')
   
-  @profile
+  #@profile
   def dataset_to_numpy(self, dataset, mode):
     #inputs: dataset-iterable with the data
     #mode-the extension to distinguish which loader it is-a string
@@ -47,7 +47,7 @@ class ModelTester():
       np.save(self.save_dir+mode+str(classname)+'.npy', data)
       print(mode+' '+str(classname))
   
-  @profile
+  #@profile
   def compare_classes(self, model, classes, mode):
     #inputs: model-a torch model class, must contain a snapshot_forward
     #and a snapshot dict
@@ -72,14 +72,14 @@ class ModelTester():
       class_1_item = snapshot_1[key]
       class_2_item = snapshot_2[key]
       
-      scores['Euclid '+key] = self.HP_euclid.calculateHP(class_1_item,class_2_item)
+      scores['Euclid '+key] = self.HP_euclid(class_1_item,class_2_item)
       #scores['Cosine '+key] = self.HP_cosine.calculateHP(class_1_item,class_2_item)
     
     #print(scores['Euclid Initial'])
     return(scores)
   
-  @profile
-  def evaluate_model(self, model):
+  #@profile
+  def __call__(self, model):
     #input: model
     #output: a dict of dicts with all the test results for the entire model
     data = {}

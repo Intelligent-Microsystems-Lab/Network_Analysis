@@ -51,9 +51,9 @@ model_post.to(device).to(torch.float32)
 #run the HP testing for each model			
 testing = ModelTester(practice_loader1,practice_loader2,[i for i in range(10)],'./Transformed Data/',device)
 
-pre_results = testing.evaluate_model(model_pre)
-during_results = testing.evaluate_model(model_during)
-post_results = testing.evaluate_model(model_post)
+pre_results = testing(model_pre)
+during_results = testing(model_during)
+post_results = testing(model_post)
 
 #store the results from testing in json files
 with open(result_storage_dir+'preDict.json','w') as f:
