@@ -13,7 +13,7 @@ class ModelTester():
     #set batch size to 1
     self.classes = classes
     self.save_dir = save_dir
-    
+
     if not os.path.isdir(save_dir):
       print('Reorganizing the dataset')
       os.mkdir(save_dir)
@@ -21,15 +21,15 @@ class ModelTester():
       self.dataset_to_numpy(test_set,'test')
     else:
       print('Dataset present at this directory')
-    
+
     #every possible combination of two classes
     self.class_combinations = [i for i in itertools.combinations(self.classes,2)]
-    
+
     self.device = device
-    
-    self.HP_euclid = HenzePenrose('euclid')
+
+    self.HP_euclid = HenzePenrose('euclid',device)
     #self.HP_cosine = HenzePenrose('cosine')
-  
+
   #@profile
   def dataset_to_numpy(self, dataset, mode):
     #inputs: dataset-iterable with the data
@@ -42,52 +42,54 @@ class ModelTester():
             data = torch.cat((data,image), dim=0)
           else:
             data = image
-      
+
       data = data.numpy()
       np.save(self.save_dir+mode+str(classname)+'.npy', data)
       print(mode+' '+str(classname))
-  
+
   #@profile
   def compare_classes(self, model, classes, mode):
-    #inputs: model-a torch model class, must contain a snapshot_forward
+    #inputs: model-a torch nn.Module class, must contain a snapshot_forward
     #and a snapshot dict
     #classes-the two classnames to test over, should be a tuple
     #mode-either train or test
     class_1_data = torch.Tensor(np.load(self.save_dir+mode+str(classes[0])+'.npy')).to(self.device)
     class_2_data = torch.Tensor(np.load(self.save_dir+mode+str(classes[1])+'.npy')).to(self.device)
-    
-    class_1_data = class_1_data[:10]
-    class_2_data = class_2_data[:10]
-    
+
+    class_1_data = class_1_data[:100]
+    class_2_data = class_2_data[:100]
+
     model.snapshot_forward(class_1_data)
     snapshot_1 = model.snapshot.copy()
 
     model.snapshot_forward(class_2_data)
     snapshot_2 = model.snapshot.copy()
-    
+
     #snapshots 1 and 2 should now contain dicts with the results at each stage from classes 1 and 2
     scores = {}
-    
+
     for key in snapshot_1.keys():
       class_1_item = snapshot_1[key]
       class_2_item = snapshot_2[key]
-      
+
       scores['Euclid '+key] = self.HP_euclid(class_1_item,class_2_item)
       #scores['Cosine '+key] = self.HP_cosine.calculateHP(class_1_item,class_2_item)
-    
+
+
     #print(scores['Euclid Initial'])
     return(scores)
-  
+
   #@profile
   def __call__(self, model):
     #input: model
     #output: a dict of dicts with all the test results for the entire model
     data = {}
-    
+
     for combo in self.class_combinations:
       print(combo)
       data[str(combo)+' train'] = self.compare_classes(model,combo,'train')
-      
+      torch.cuda.empty_cache()
       data[str(combo)+' test'] = self.compare_classes(model,combo,'test')
-    
+      torch.cuda.empty_cache()
+
     return(data)

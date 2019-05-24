@@ -1,121 +1,134 @@
 import json
 from copy import deepcopy
-
-#read in data and convert to dicts
-storage_dir = 'Final_Dicts/'
-data = ['preDict','duringDict','postDict']
-for (i,element) in enumerate(data):
-  with open('{}{}.json'.format(storage_dir,element),'r') as f:
-    text = f.readline()
-  data[i] = json.loads(text)
-
-#reorgainize the data
-fields = [i for i in data[0].keys()]
-train_results = data[0][fields[0]].copy()
-
-for key in train_results.keys():
-  train_results[key] = [[] for i in range(len(data))]
- 
-test_results = deepcopy(train_results)
-
-for i,item in enumerate(data):   #iterate through all stages-pre,during,post
-  for cat,comb in item.items():     #iterate through all combinations-(0,1),(1,2),etc.
-    for key,val in comb.items(): #iterate through all layers of the net
-      if 'train' in cat:
-        train_results[key][i].append(val)
-      else:
-        test_results[key][i].append(val)
-
- 
-#plot results
-#subplot(nrows, ncols, index, **kwargs)
 import matplotlib.pyplot as plt
-keys = [i for i in train_results.keys() if 'Euclid' in i]
-n = len(keys)
-for i,key in enumerate(keys):
-  plt.subplot(n,2,2*i+1)
-  plt.hist(train_results[key][0],bins=100,range=[0,1])
-  plt.title(f'{key} Before')
-  plt.subplot(n,2,2*i+2)
-  plt.hist(train_results[key][2],bins=100,range=[0,1])
-  plt.title(f'{key} After')
-plt.show()
-
-
-#compute the Fisher test
-from statistics import mean
-from random import shuffle
-
-def FisherMeans(X,Y,n):
-  #inputs: X, Y-two samples stored as python lists
-  #Performs the Fisher permutation test of
-  #difference of means in order to estimate a p-value
-  nx = len(X)
-  ny = len(Y)
-  
-  t = abs(mean(X)-mean(Y)) #the test statistic
-  U = X + Y   #pooled sample of X and Y
-  Nextreme = 0 #number of samples more extreme than t
-  
-  #Monte-Carlo iteration
-  for i in range(n):
-    #randomly permute order of U
-    Uprime = U.copy() 
-    shuffle(Uprime)
-    
-    #split into Xprime and Yprime
-    Xprime = Uprime[:nx]
-    Yprime = Uprime[nx:]
-    
-    #compute the new test statistic
-    tprime = abs(mean(Xprime)-mean(Yprime))
-    
-    #increment Nextreme if tprime>t
-    if tprime > t:
-      Nextreme += 1
-    
-  p = Nextreme/(n+1)
-  
-  return p
-
-n = 1000
-
-train_fisher = deepcopy(train_results)
-test_fisher = deepcopy(test_results)
-for key in train_fisher.keys():
-  print(key)
-  train = train_fisher[key]
-  test = test_fisher[key]
-  
-  train_fisher[key] = FisherMeans(train[0],train[2],n)
-  test_fisher[key] = FisherMeans(test[0],test[2],n)
-
-print('Training:')
-for key,val in train_fisher.items():
-  print(f'{key}: {val}')
-print('Testing:')
-for key,val in test_fisher.items():
-  print(f'{key}: {val}')
-"""
-#can plot the 2d PCA of two classes
-from sklearn.decomposition import PCA
 import torch
+import numpy as np
+from sklearn.decomposition import PCA
 
-def plotPCA(class1,class2):
-  #assume class1 and class2 are unrolled
-  #both should be tensors
-  combined = torch.cat((class1,class2),dim=0)
-  pca = PCA(n_components=2)
-  principalComponents = pca.fit_transform(combined)
-  
-  #slice the output
-  class1_x = principalComponents[:len(class1),0]
-  class1_y = principalComponents[:len(class1),1]
-  class2_x = principalComponents[len(class1):,0]
-  class2_y = principalComponents[len(class1):,1]
-  
-  #construct the plot
-  plt.plot(class1_x,class1_y,'ro')
-  plt.plot(class2_x,class2_y,'bo')
-  plt.show()
-"""
+class ResultsAnalysis():
+    def __init__(self):
+        self.storage_dir = 'Final_Dicts/'
+        self.stages = ['preDict','postDict']
+        self.train_results,self.test_results = self.load_data(self.stages)
+
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    def load_data(self,data):
+        #loads the JSON dicts into data and formats them correctly
+        for (i,element) in enumerate(data):
+            with open('{}{}.json'.format(self.storage_dir,element),'r') as f:
+                text = f.readline()
+            data[i] = json.loads(text)
+
+        #reorganizes the dataset
+        fields = [i for i in data[0].keys()]
+        train_results = data[0][fields[0]].copy()
+
+        for key in train_results.keys():
+            train_results[key] = [[] for i in range(len(data))]
+        test_results = deepcopy(train_results)
+
+        for i,item in enumerate(data):  #iterate through all stages-pre,during,post
+            for cat,comb in item.items():    #iterate through all combinations-(0,1),(1,2),etc.
+                for key,val in comb.items(): #iterate through all layers of the net
+                    if 'train' in cat:
+                        train_results[key][i].append(val)
+                    else:
+                        test_results[key][i].append(val)
+
+        return train_results,test_results
+
+    def plot_results(self,results,stages=['Before','After'],metric='Euclid'):
+        #plots a before and after of the results
+        #results: Either train_results or test_results
+        #stages: What to label each graph
+        #metric: Distance function, "Euclid" for example
+        keys = [i for i in results if metric in i]
+        n = len(keys)
+        m = len(stages)
+
+        for i,key in enumerate(keys):
+            for j,name in enumerate(stages):
+                plt.subplot(n,m,m*i+j+1)
+                plt.hist(results[key][j],bins=100,range=[0,1])
+                plt.title('{} {}'.format(key,name))
+        plt.show()
+
+    def FisherMeans(self,X,Y,n,batches=1):
+        #inputs: X, Y-two samples stored as python lists
+        #n-number of iterations
+        #Performs the Fisher permutation test of
+        #difference of means in order to estimate a p-value
+        nx = len(X)
+        ny = len(Y)
+
+        U = torch.Tensor(X+Y).to(self.device) #pooled sample of X and Y
+        X = np.array(X)
+        Y = np.array(Y)
+        t = np.abs(np.mean(X)-np.mean(Y)) #test statistic
+        nU = len(U)
+        Nextreme = 0 #number of samples more extreme than # TEMP:
+
+        nBatch = int(n/batches)
+        for batch in range(batches):
+            perms = torch.stack([torch.randperm(nU) for i in range(int(nBatch))]).to(self.device)
+            shuffled = torch.stack([U]*nBatch).to(self.device)
+            shuffled = shuffled.scatter(1,perms,shuffled)
+
+            shuffled_x = shuffled[:,:nx]
+            shuffled_y = shuffled[:,nx:]
+
+            shuffled_x = torch.sum(shuffled_x,dim=1)/nx
+            shuffled_y = torch.sum(shuffled_y,dim=1)/ny
+
+            tprimes = torch.abs(shuffled_x-shuffled_y)
+            tprimes = tprimes>t
+            Nextreme += torch.sum(tprimes).to(torch.float32)
+
+        p = Nextreme/(n+1)
+        return p
+
+    def TestFisher(self,n,batches=1):
+        #a wrapper for the FisherMeans function
+        train_fisher = deepcopy(self.train_results)
+        test_fisher = deepcopy(self.test_results)
+
+        for key in train_fisher.keys():
+            print(key)
+            train = train_fisher[key]
+            test = test_fisher[key]
+
+            train_fisher[key] = self.FisherMeans(train[0],train[-1],n,batches=batches)
+            test_fisher[key] = self.FisherMeans(test[0],test[-1],n,batches=batches)
+
+        print('Training:')
+        for key,val in train_fisher.items():
+            print(f'{key}: {val}')
+        print('Testing:')
+        for key,val in test_fisher.items():
+            print(f'{key}: {val}')
+
+    def plotPCA(self,class1,class2):
+        #This function combines the two given classes and performs
+        #PCA on the combination, reducing down to 2 dimensions.
+        #It then visualizes the two classes on a plot
+        #class1 and class2 should be unrolled tensors
+        combined = torch.cat((class1,class2),dim=0)
+        pca = PCA(n_components=2)
+        principalComponents = pca.fit_transform(combined)
+
+        #slice the output
+        class1_x = principalComponents[:len(class1),0]
+        class1_y = principalComponents[:len(class1),1]
+        class2_x = principalComponents[len(class1):,0]
+        class2_y = principalComponents[len(class1):,1]
+
+        #construct the plot
+        plt.plot(class1_x,class1_y,'ro')
+        plt.plot(class2_x,class2_y,'bo')
+        plt.show()
+
+
+ra = ResultsAnalysis()
+#ra.plot_results(ra.train_results) #can comment out or swap in ra.test_results
+ra.TestFisher(100000,batches=1)  #modify n/batches as needed
