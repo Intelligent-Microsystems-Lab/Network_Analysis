@@ -6,8 +6,8 @@ import numpy as np
 from sklearn.decomposition import PCA
 
 class ResultsAnalysis():
-    def __init__(self):
-        self.storage_dir = 'Final_Dicts/'
+    def __init__(self,storage_dir):
+        self.storage_dir = storage_dir
         self.stages = ['preDict','postDict']
         self.train_results,self.test_results = self.load_data(self.stages)
 
@@ -38,21 +38,31 @@ class ResultsAnalysis():
 
         return train_results,test_results
 
-    def plot_results(self,results,stages=['Before','After'],metric='Euclid'):
+    def plot_results(self,results,stages=['Before','After'],metric='Euclid',by_layer=False):
         #plots a before and after of the results
         #results: Either train_results or test_results
         #stages: What to label each graph
         #metric: Distance function, "Euclid" for example
+        #by_layer: plots all at once if False, or one layer at a time if true
         keys = [i for i in results if metric in i]
         n = len(keys)
         m = len(stages)
 
-        for i,key in enumerate(keys):
-            for j,name in enumerate(stages):
-                plt.subplot(n,m,m*i+j+1)
-                plt.hist(results[key][j],bins=100,range=[0,1])
-                plt.title('{} {}'.format(key,name))
-        plt.show()
+        if by_layer:
+            for i,key in enumerate(keys):
+                for j,name in enumerate(stages):
+                    plt.subplot(1,m,j+1)
+                    plt.hist(results[key][j],bins=100,range=[0,1])
+                    plt.title('{} {}'.format(key,name))
+                plt.show()
+
+        else:
+            for i,key in enumerate(keys):
+                for j,name in enumerate(stages):
+                    plt.subplot(n,m,m*i+j+1)
+                    plt.hist(results[key][j],bins=100,range=[0,1])
+                    plt.title('{} {}'.format(key,name))
+            plt.show()
 
     def FisherMeans(self,X,Y,n,batches=1):
         #inputs: X, Y-two samples stored as python lists
@@ -88,8 +98,8 @@ class ResultsAnalysis():
         p = Nextreme/(n+1)
         return p
 
-    def TestFisher(self,n,batches=1):
-        #a wrapper for the FisherMeans function
+    def FisherTraining(self,n,batches=1):
+        #Compares HP values before and after training at each layer
         train_fisher = deepcopy(self.train_results)
         test_fisher = deepcopy(self.test_results)
 
@@ -106,6 +116,29 @@ class ResultsAnalysis():
             print(f'{key}: {val}')
         print('Testing:')
         for key,val in test_fisher.items():
+            print(f'{key}: {val}')
+
+    def FisherLayers(self,n,batches=1):
+        #Compares HP values between each layer in a network
+        train_fisher = deepcopy(self.train_results)
+        test_fisher = deepcopy(self.test_results)
+        train_outcome = {}
+        test_outcome = {}
+
+        keys = [i for i in train_fisher.keys()]
+
+        for i in range(len(keys)-1):
+            name = f'{keys[i]} vs {keys[i+1]}'
+            print(name)
+
+            train_outcome[name] = self.FisherMeans(train_fisher[keys[i]][-1],train_fisher[keys[i+1]][-1],n,batches=batches)
+            test_outcome[name] = self.FisherMeans(test_fisher[keys[i]][-1],test_fisher[keys[i+1]][-1],n,batches=batches)
+
+        print('Training:')
+        for key,val in train_outcome.items():
+            print(f'{key}: {val}')
+        print('Testing:')
+        for key,val in test_outcome.items():
             print(f'{key}: {val}')
 
     def plotPCA(self,class1,class2):
@@ -129,6 +162,7 @@ class ResultsAnalysis():
         plt.show()
 
 
-ra = ResultsAnalysis()
-#ra.plot_results(ra.train_results) #can comment out or swap in ra.test_results
-ra.TestFisher(100000,batches=1)  #modify n/batches as needed
+ra = ResultsAnalysis('Hadamard_Dicts/')
+#ra.plot_results(ra.train_results,by_layer=True) #can comment out or swap in ra.test_results
+#ra.FisherTraining(100000,batches=1)  #modify n/batches as needed
+ra.FisherLayers(100000,batches=1)
