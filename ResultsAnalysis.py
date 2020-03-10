@@ -6,9 +6,9 @@ import numpy as np
 from sklearn.decomposition import PCA
 
 class ResultsAnalysis():
-    def __init__(self,storage_dir):
+    def __init__(self,storage_dir,stages):
         self.storage_dir = storage_dir
-        self.stages = ['preDict','postDict']
+        self.stages = stages
         self.train_results,self.test_results = self.load_data(self.stages)
 
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -162,7 +162,4 @@ class ResultsAnalysis():
         plt.show()
 
 
-ra = ResultsAnalysis('Hadamard_Dicts/')
-#ra.plot_results(ra.train_results,by_layer=True) #can comment out or swap in ra.test_results
-#ra.FisherTraining(100000,batches=1)  #modify n/batches as needed
-ra.FisherLayers(100000,batches=1)
+
