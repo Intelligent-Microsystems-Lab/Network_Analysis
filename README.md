@@ -36,6 +36,7 @@ separation increases before and after training.
 ### Library Usage
 A couple steps need to be taken in order to analyze your networks with
 this tool. To follow along with this guide, view the `example` folder.
+All code required for library operation can be found in the `src` folder.
 
 #### Step 1: Network Definition
 The first step is to define your network in the standard Pytorch way,
